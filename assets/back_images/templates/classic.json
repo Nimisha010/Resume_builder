@@ -1,0 +1,44 @@
+{
+  "template_id": "temp_1",
+  "template_name": "Classic Resume",
+  "ats_compliant": true,
+  "json_data": {
+    "sections": [
+      {
+        "section_id": "personal_info",
+        "title": "Personal Information",
+        "fields": ["Name", "Address", "Phone no", "Email ID", "GitHub Profile", "LinkedIn Profile", "Languages"]
+      },
+      {
+        "section_id": "education",
+        "title": "Education",
+        "fields": ["Qualification", "Institution name", "Course join date", "Course completion date"]
+      },
+      {
+        "section_id": "experience",
+        "title": "Experience",
+        "fields": ["Job Title", "Company name", "Start Date", "End Date"]
+      },
+      {
+        "section_id": "skills",
+        "title": "Skills",
+        "fields": ["Soft skills", "Technical skills"]
+      },
+      {
+        "section_id": "projects",
+        "title": "Projects",
+        "fields": ["Title", "Role", "Technologies/Tools"]
+      },
+      {
+        "section_id": "awards_achievements",
+        "title": "Awards/Achievements",
+        "fields": []  // ✅ Ensure empty array
+      },
+      {
+        "section_id": "certificates",
+        "title": "Certificates",
+        "fields": []  // ✅ Ensure empty array
+      }
+    ]
+  }
+}
