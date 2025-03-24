@@ -1483,7 +1483,7 @@ class _ResumeSelectionScreenState extends State<ResumeSelectionScreen> {
   }
 }
 */
-
+/*correct one 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/resume_template.dart';
@@ -1547,6 +1547,90 @@ class _ResumeSelectionScreenState extends State<ResumeSelectionScreen> {
                         builder: (context) => ResumePreviewScreen(
                           template: template,
                           userId: userData, // Pass correct user data
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+*/
+
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/resume_template.dart';
+import '../services/firestore_service.dart';
+import 'resume_preview.dart'; // Updated preview screen
+
+class ResumeSelectionScreen extends StatefulWidget {
+  @override
+  _ResumeSelectionScreenState createState() => _ResumeSelectionScreenState();
+}
+
+class _ResumeSelectionScreenState extends State<ResumeSelectionScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  late Future<List<ResumeTemplate>> _templatesFuture;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _templatesFuture = _firestoreService.getTemplates();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    User? user = _auth.currentUser; // Get logged-in user
+
+    if (user == null) {
+      return Scaffold(
+        body: Center(child: Text("Please log in to continue")),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: Text("Select Resume Template")),
+      body: FutureBuilder<List<ResumeTemplate>>(
+        future: _templatesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text("No templates found"));
+          }
+
+          return ListView.builder(
+            itemCount: snapshot.data!.length,
+            itemBuilder: (context, index) {
+              ResumeTemplate template = snapshot.data![index];
+
+              return Card(
+                child: ListTile(
+                  title: Text(template.templateName),
+                  subtitle: Text(
+                      "ATS Compliant: ${template.atsCompliant ? "Yes" : "No"}"),
+                  onTap: () async {
+                    Map<String, dynamic> userData =
+                        await _firestoreService.getUserData(user.uid);
+
+                    // Save selected template in Firebase
+                    await _firestoreService.saveSelectedTemplate(
+                        user.uid, template.templateName);
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ResumePreviewScreen(
+                          templateName:
+                              template.templateName, // Pass only template name
+                          userId: user.uid, // Pass user ID
                         ),
                       ),
                     );

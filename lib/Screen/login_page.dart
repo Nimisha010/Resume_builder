@@ -182,7 +182,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 30),
-                  _buildLabel('USERNAME'),
+                  _buildLabel('EMAIL ID'),
                   _buildTextField(_emailController, false),
                   const SizedBox(height: 20),
                   _buildLabel('PASSWORD'),

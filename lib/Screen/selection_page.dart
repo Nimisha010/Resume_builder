@@ -125,7 +125,7 @@ class ResumeSelectionPage extends StatelessWidget {
               const SizedBox(height: 40),
 
               // Saved Resumes Button
-              GestureDetector(
+              /* GestureDetector(
                 onTap: () {
                   // Navigate to saved resumes page (To be implemented)
                 },
@@ -147,7 +147,7 @@ class ResumeSelectionPage extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
+              ),*/
             ],
           ),
         ),

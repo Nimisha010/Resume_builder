@@ -910,6 +910,7 @@ import 'screen/splash_screen.dart'; // Import Splash Screen
 import 'screen/selection_page.dart';
 import 'screen/create_resume_page.dart'; // Import Create Resume Page
 import 'screen/resume_selection.dart'; // Import Resume Selection Screen
+import 'screen/summary_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -933,6 +934,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/resume_selection': (context) => ResumeSelectionScreen(),
         '/create_resume': (context) => const CreateResumePage(),
+        '/generate_summary': (context) => const GenerateSummaryPage(),
       },
       home: const SplashScreen(), // Start with Splash Screen
     );

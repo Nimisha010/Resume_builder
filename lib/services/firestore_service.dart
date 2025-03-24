@@ -258,7 +258,7 @@ class FirestoreService {
   }
 }
 */
-
+/*correct one
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/resume_template.dart';
 
@@ -308,6 +308,95 @@ class FirestoreService {
     } catch (e) {
       print("🔥 Error fetching user data: $e");
       return {}; // Return empty map on error
+    }
+  }
+}
+*/
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/resume_template.dart';
+
+class FirestoreService {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // 🔍 Fetch available resume templates from Firestore
+  Future<List<ResumeTemplate>> getTemplates() async {
+    try {
+      QuerySnapshot querySnapshot = await _db.collection('templates').get();
+
+      if (querySnapshot.docs.isEmpty) {
+        print("❌ No templates found in Firestore.");
+        return [];
+      }
+
+      return querySnapshot.docs.map((doc) {
+        Map<String, dynamic> jsonData = doc.data() as Map<String, dynamic>;
+        return ResumeTemplate.fromJson(jsonData);
+      }).toList();
+    } catch (e) {
+      print("🔥 Error fetching templates: $e");
+      return [];
+    }
+  }
+
+  // 🔍 Fetch user data by userId
+  Future<Map<String, dynamic>> getUserData(String userId) async {
+    try {
+      DocumentSnapshot userDoc =
+          await _db.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) {
+        print("❌ User not found in Firestore!");
+        return {};
+      }
+
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+      print("✅ User Data Fetched: ${userData.toString()}");
+
+      return userData;
+    } catch (e) {
+      print("🔥 Error fetching user data: $e");
+      return {};
+    }
+  }
+
+  // 💾 Save selected template for a user
+  Future<void> saveSelectedTemplate(String userId, String templateName) async {
+    try {
+      await _db
+          .collection('users')
+          .doc(userId)
+          .update({'selectedTemplate': templateName});
+      print("✅ Selected template '$templateName' saved for user $userId.");
+    } catch (e) {
+      print("🔥 Error saving selected template: $e");
+    }
+  }
+
+  // 📌 Get selected template name for a user
+  Future<String?> getSelectedTemplate(String userId) async {
+    try {
+      DocumentSnapshot userDoc =
+          await _db.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) {
+        print("❌ No user found with ID: $userId");
+        return null;
+      }
+
+      // Explicitly cast data to Map<String, dynamic>
+      Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
+
+      if (userData == null || !userData.containsKey('selectedTemplate')) {
+        print("❌ No selected template found for user $userId.");
+        return null;
+      }
+
+      String templateName = userData['selectedTemplate'];
+      print("✅ User $userId selected template: $templateName");
+      return templateName;
+    } catch (e) {
+      print("🔥 Error fetching selected template: $e");
+      return null;
     }
   }
 }
