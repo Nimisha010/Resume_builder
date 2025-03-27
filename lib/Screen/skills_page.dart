@@ -696,6 +696,7 @@ class _SkillsPageState extends State<SkillsPage> {
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF184D47),
                         fontFamily: 'Times New Roman',
                       ),
                     ),
