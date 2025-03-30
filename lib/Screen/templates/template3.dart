@@ -1488,9 +1488,9 @@ class Template3 extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(userId["contactDetails"] ?? {}),
-                    if (userId["summary"] != null &&
-                        userId["summary"].isNotEmpty)
-                      _buildSection("SUMMARY", [userId["summary"]]),
+                    if (userId["selected_summary"] != null &&
+                        userId["selected_summary"].isNotEmpty)
+                      _buildSection("SUMMARY", [userId["selected_summary"]]),
                     _buildExperienceSection(userId["experience"] ?? []),
                     _buildSkillsSection(userId),
                     _buildSection(
@@ -1530,9 +1530,9 @@ class Template3 extends StatelessWidget {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 _buildPdfHeader(userData["contactDetails"] ?? {}),
-                if (userData["summary"] != null &&
-                    userData["summary"].isNotEmpty)
-                  _buildPdfSection("SUMMARY", [userData["summary"]]),
+                if (userData["selected_summary"] != null &&
+                    userData["selected_summary"].isNotEmpty)
+                  _buildPdfSection("SUMMARY", [userData["selected_summary"]]),
                 _buildPdfExperienceSection(userData["experience"] ?? []),
                 _buildPdfSkillsSection(userData),
                 _buildPdfSection(

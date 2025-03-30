@@ -820,7 +820,7 @@ class _Template1State extends State<Template1> {
     if (doc.exists) {
       final data = doc.data()!;
       setState(() {
-        _summary = data['summary'] ?? 'No summary available';
+        _summary = data['selected_summary'] ?? 'No summary available';
         _isLoading = false;
       });
     } else {
