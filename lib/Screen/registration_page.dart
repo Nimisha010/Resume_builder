@@ -518,7 +518,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       'OR',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 15,
                         fontFamily: 'Times New Roman',
                       ),
                     ),
@@ -574,8 +574,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
   Widget _buildAuthButton(String text, VoidCallback onPressed,
       {bool isLoading = false}) {
     return SizedBox(
-      width: 180,
-      height: 45,
+      width: 200,
+      height: 60,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -590,7 +590,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             : Text(
                 text,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: Colors.white,
                   fontFamily: 'Times New Roman',
                 ),
@@ -627,13 +627,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 }
 
-
 /*
+
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/auth_service.dart';
-import 'selection_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+import 'package:intl/intl.dart';
+import 'package:resume_app/screen/selection_page.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -643,293 +644,162 @@ class RegistrationPage extends StatefulWidget {
 }
 
 class _RegistrationPageState extends State<RegistrationPage> {
-  final TextEditingController _emailController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
   final TextEditingController _otpController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  bool _isPasswordVisible = false;
-  bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
   bool _otpSent = false;
-  String? _verificationId;
-  int? _generatedOtp;
+  String? _generatedOtp;
+  DateTime? _otpExpiry;
 
-  Future<void> _generateAndSendOtp() async {
+  // Generate a 6-digit OTP
+  String _generateOtp() {
+    final random = Random();
+    return (100000 + random.nextInt(900000)).toString();
+  }
+
+  Future<void> _sendOtp() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      try {
-        // Generate 6-digit OTP
-        _generatedOtp = _generate6DigitOtp();
 
-        // Store OTP in Firestore temporarily
-        await _firestore.collection('temp_otp').doc(_emailController.text).set({
+      try {
+        // Check username availability
+        final usernameQuery = await _firestore
+            .collection('users')
+            .where('username', isEqualTo: _usernameController.text.trim())
+            .limit(1)
+            .get();
+
+        if (usernameQuery.docs.isNotEmpty) {
+          throw Exception('Username already taken');
+        }
+
+        // Generate and store OTP
+        _generatedOtp = _generateOtp();
+        _otpExpiry = DateTime.now().add(const Duration(minutes: 5));
+
+        await _firestore
+            .collection('otps')
+            .doc(_phoneController.text.trim())
+            .set({
           'otp': _generatedOtp,
-          'createdAt': FieldValue.serverTimestamp(),
+          'expiry': _otpExpiry,
+          'username': _usernameController.text.trim(),
+          'password': _passwordController.text.trim(),
         });
 
-        // Send OTP to email (in production, use a real email service)
-        await _auth.sendSignInLinkToEmail(
-          email: _emailController.text,
-          actionCodeSettings: firebase_auth.ActionCodeSettings(
-            url: 'https://yourapp.page.link/verify',
-            handleCodeInApp: true,
-            androidPackageName: 'com.example.app',
-            iOSBundleId: 'com.example.app',
-          ),
-        );
-
         setState(() => _otpSent = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTP sent to your email')),
-        );
+        _showSnackBar('OTP sent (for testing: $_generatedOtp)');
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send OTP: ${e.toString()}')),
-        );
+        _showSnackBar('Error: ${e.toString()}');
       } finally {
         setState(() => _isLoading = false);
       }
     }
   }
 
-  int _generate6DigitOtp() {
-    return 100000 + (DateTime.now().millisecondsSinceEpoch % 900000);
-  }
-
   Future<void> _verifyOtpAndRegister() async {
-    if (_otpController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter OTP')),
-      );
-      return;
-    }
-
     setState(() => _isLoading = true);
     try {
-      // Get stored OTP from Firestore
-      final doc = await _firestore
-          .collection('temp_otp')
-          .doc(_emailController.text)
+      final otpDoc = await _firestore
+          .collection('otps')
+          .doc(_phoneController.text.trim())
           .get();
-      final storedOtp = doc.data()?['otp'] as int?;
 
-      if (storedOtp == null || int.parse(_otpController.text) != storedOtp) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid OTP')),
-        );
-        return;
+      if (!otpDoc.exists || otpDoc['otp'] != _otpController.text.trim()) {
+        throw Exception('Invalid OTP');
       }
 
-      // OTP verified - create user account
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text,
-        password: _passwordController.text,
+      if (DateTime.now().isAfter((otpDoc['expiry'] as Timestamp).toDate())) {
+        throw Exception('OTP expired');
+      }
+
+      // Create user with email/password using phone as email
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: '${_phoneController.text.trim()}@phone.auth',
+        password: otpDoc['password'],
       );
 
-      // Delete temporary OTP
-      await _firestore
-          .collection('temp_otp')
-          .doc(_emailController.text)
-          .delete();
+      // Store user data
+      await _firestore.collection('users').doc(userCredential.user?.uid).set({
+        'username': otpDoc['username'],
+        'phone': _phoneController.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-      // Navigate to app
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ResumeSelectionPage()),
-      );
+      // Navigate to next screen
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ResumeSelectionPage()),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Verification failed: ${e.toString()}')),
-      );
+      _showSnackBar('Error: ${e.toString()}');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/back_images/reg_background.jpg'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.person_add, size: 80, color: Colors.teal),
-                    const SizedBox(height: 20),
-
-                    if (_otpSent) ...[
-                      TextFormField(
-                        controller: _otpController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Enter OTP',
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _buildAuthButton(
-                        'Verify OTP',
-                        _verifyOtpAndRegister,
-                        isLoading: _isLoading,
-                      ),
-                      const SizedBox(height: 10),
-                      TextButton(
-                        onPressed: _isLoading ? null : _generateAndSendOtp,
-                        child: const Text(
-                          'Resend OTP',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'OR',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // Email Field
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Enter email';
-                        }
-                        if (!_isValidEmail(value)) {
-                          return 'Enter a valid email';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Password Field
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: !_isPasswordVisible,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: Icon(_isPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                      validator: (value) => (value == null || value.isEmpty)
-                          ? 'Enter password'
-                          : (value.length < 6
-                              ? 'Password must be at least 6 characters'
-                              : null),
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Confirm Password Field
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: !_isConfirmPasswordVisible,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm Password',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: Icon(_isConfirmPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off),
-                          onPressed: () {
-                            setState(() {
-                              _isConfirmPasswordVisible =
-                                  !_isConfirmPasswordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Confirm your password';
-                        }
-                        if (value != _passwordController.text) {
-                          return 'Passwords do not match';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    if (!_otpSent)
-                      _buildAuthButton(
-                        'Send OTP',
-                        _generateAndSendOtp,
-                        isLoading: _isLoading,
-                      ),
-                  ],
-                ),
+      appBar: AppBar(title: const Text('Register')),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(labelText: 'Username'),
+                validator: (value) => value!.isEmpty ? 'Required' : null,
               ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAuthButton(String text, VoidCallback onPressed,
-      {bool isLoading = false}) {
-    return SizedBox(
-      width: 180,
-      height: 45,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.teal,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-        ),
-        child: isLoading
-            ? const CircularProgressIndicator(color: Colors.white)
-            : Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
+              TextFormField(
+                controller: _phoneController,
+                decoration: const InputDecoration(labelText: 'Phone Number'),
+                keyboardType: TextInputType.phone,
+                validator: (value) => value!.isEmpty ? 'Required' : null,
               ),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password'),
+                validator: (value) =>
+                    value!.length < 6 ? 'Min 6 characters' : null,
+              ),
+              if (_otpSent) ...[
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _otpController,
+                  decoration: const InputDecoration(labelText: 'Enter OTP'),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _isLoading
+                    ? null
+                    : (_otpSent ? _verifyOtpAndRegister : _sendOtp),
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : Text(_otpSent ? 'Verify OTP' : 'Send OTP'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

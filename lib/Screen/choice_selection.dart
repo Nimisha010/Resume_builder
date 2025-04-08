@@ -1,4 +1,7 @@
+// choice_screen.dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'chat_screen.dart';
 import 'resume_selection.dart';
 
 class ChoiceScreen extends StatelessWidget {
@@ -16,7 +19,6 @@ class ChoiceScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Title
             const Text(
               "How would you like to proceed?",
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
@@ -33,7 +35,8 @@ class ChoiceScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ResumeSelectionScreen(),
+                    builder: (context) =>
+                        ResumeSelectionScreen(), // Removed const
                   ),
                 );
               },
@@ -47,8 +50,30 @@ class ChoiceScreen extends StatelessWidget {
               icon: Icons.chat_bubble_outline,
               title: "AI Companion",
               subtitle: "Chat with AI to refine your resume content.",
-              onTap: () {
-                Navigator.pushNamed(context, '/ai_chat');
+              onTap: () async {
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please sign in first'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatbotPage(), // Removed const
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                    ),
+                  );
+                }
               },
             ),
           ],
@@ -57,7 +82,6 @@ class ChoiceScreen extends StatelessWidget {
     );
   }
 
-  // Reusable card widget for options
   Widget _buildOptionCard(
     BuildContext context, {
     required IconData icon,

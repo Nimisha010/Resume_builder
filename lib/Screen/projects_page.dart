@@ -1559,6 +1559,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
 }
 */
 
+/*correct one
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -2029,6 +2031,571 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deleteCertificate(index),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+  }
+}
+*/
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'summary_page.dart';
+
+class ProjectsPage extends StatefulWidget {
+  const ProjectsPage({super.key});
+
+  @override
+  _ProjectsPageState createState() => _ProjectsPageState();
+}
+
+class _ProjectsPageState extends State<ProjectsPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _roleController = TextEditingController();
+  final TextEditingController _technologyController = TextEditingController();
+  final TextEditingController _awardController = TextEditingController();
+  final TextEditingController _certificateController = TextEditingController();
+
+  List<Map<String, dynamic>> projects = [];
+  List<String> awards = [];
+  List<String> certificates = [];
+
+  int? _selectedProjectIndex;
+  int? _selectedAwardIndex;
+  int? _selectedCertificateIndex;
+
+  bool _hasUnsavedChanges() {
+    return _titleController.text.isNotEmpty ||
+        _roleController.text.isNotEmpty ||
+        _technologyController.text.isNotEmpty ||
+        _awardController.text.isNotEmpty ||
+        _certificateController.text.isNotEmpty;
+  }
+
+  Future<bool> _showUnsavedChangesDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Unsaved Changes'),
+            content: const Text(
+                'You have unsaved changes. Do you want to save them before continuing?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Discard'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (_titleController.text.isNotEmpty &&
+                      _roleController.text.isNotEmpty &&
+                      _technologyController.text.isNotEmpty) {
+                    _addProject();
+                  }
+                  if (_awardController.text.isNotEmpty) {
+                    _addAward();
+                  }
+                  if (_certificateController.text.isNotEmpty) {
+                    _addCertificate();
+                  }
+                  Navigator.pop(context, true);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProjectsData();
+  }
+
+  void _addProject() {
+    if (_titleController.text.isNotEmpty &&
+        _roleController.text.isNotEmpty &&
+        _technologyController.text.isNotEmpty) {
+      setState(() {
+        if (_selectedProjectIndex == null) {
+          projects.add({
+            'title': _titleController.text,
+            'role': _roleController.text,
+            'technologies': _technologyController.text
+                .split(',')
+                .map((tech) => tech.trim())
+                .toList(),
+            'is_ai_generated': false,
+          });
+        } else {
+          projects[_selectedProjectIndex!] = {
+            'title': _titleController.text,
+            'role': _roleController.text,
+            'technologies': _technologyController.text
+                .split(',')
+                .map((tech) => tech.trim())
+                .toList(),
+            'is_ai_generated':
+                projects[_selectedProjectIndex!]['is_ai_generated'] ?? false,
+          };
+          _selectedProjectIndex = null;
+        }
+        _titleController.clear();
+        _roleController.clear();
+        _technologyController.clear();
+      });
+      _saveProjectsData();
+    }
+  }
+
+  void _addAward() {
+    if (_awardController.text.isNotEmpty) {
+      setState(() {
+        if (_selectedAwardIndex == null) {
+          awards.add(_awardController.text);
+        } else {
+          awards[_selectedAwardIndex!] = _awardController.text;
+          _selectedAwardIndex = null;
+        }
+        _awardController.clear();
+      });
+      _saveProjectsData();
+    }
+  }
+
+  void _addCertificate() {
+    if (_certificateController.text.isNotEmpty) {
+      setState(() {
+        if (_selectedCertificateIndex == null) {
+          certificates.add(_certificateController.text);
+        } else {
+          certificates[_selectedCertificateIndex!] =
+              _certificateController.text;
+          _selectedCertificateIndex = null;
+        }
+        _certificateController.clear();
+      });
+      _saveProjectsData();
+    }
+  }
+
+  void _editProject(int index) {
+    var project = projects[index];
+    bool isAIGenerated = project['is_ai_generated'] ?? false;
+
+    if (isAIGenerated) {
+      _editAIContent(
+        context,
+        project['content'] ?? '',
+        (newContent) {
+          if (newContent != null && newContent.isNotEmpty) {
+            setState(() {
+              projects[index]['content'] = newContent;
+            });
+            _saveProjectsData();
+          }
+        },
+      );
+    } else {
+      setState(() {
+        _selectedProjectIndex = index;
+        _titleController.text = project['title'] ?? '';
+        _roleController.text = project['role'] ?? '';
+        _technologyController.text =
+            (project['technologies'] as List?)?.join(', ') ?? '';
+      });
+    }
+  }
+
+  Future<void> _editAIContent(
+    BuildContext context,
+    String initialContent,
+    Function(String?) onSave,
+  ) async {
+    final TextEditingController contentController =
+        TextEditingController(text: initialContent);
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Project'),
+        content: TextField(
+          controller: contentController,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Enter your project details',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              onSave(contentController.text);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editAward(int index) {
+    setState(() {
+      _selectedAwardIndex = index;
+      _awardController.text = awards[index];
+    });
+  }
+
+  void _editCertificate(int index) {
+    setState(() {
+      _selectedCertificateIndex = index;
+      _certificateController.text = certificates[index];
+    });
+  }
+
+  void _deleteProject(int index) {
+    setState(() {
+      projects.removeAt(index);
+      if (_selectedProjectIndex == index) {
+        _selectedProjectIndex = null;
+        _titleController.clear();
+        _roleController.clear();
+        _technologyController.clear();
+      }
+    });
+    _saveProjectsData();
+  }
+
+  void _deleteAward(int index) {
+    setState(() {
+      awards.removeAt(index);
+      if (_selectedAwardIndex == index) {
+        _selectedAwardIndex = null;
+        _awardController.clear();
+      }
+    });
+    _saveProjectsData();
+  }
+
+  void _deleteCertificate(int index) {
+    setState(() {
+      certificates.removeAt(index);
+      if (_selectedCertificateIndex == index) {
+        _selectedCertificateIndex = null;
+        _certificateController.clear();
+      }
+    });
+    _saveProjectsData();
+  }
+
+  Future<void> _fetchProjectsData() async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    DocumentSnapshot snapshot =
+        await _firestore.collection('users').doc(user.uid).get();
+    if (snapshot.exists) {
+      var data = snapshot.data() as Map<String, dynamic>;
+      setState(() {
+        projects = List<Map<String, dynamic>>.from(data['projects'] ?? [])
+            .map((project) {
+          if (project is String) {
+            return {
+              'content': project,
+              'is_ai_generated': true,
+            };
+          }
+          return {
+            'title': project['title'],
+            'role': project['role'],
+            'technologies': project['technologies'],
+            'content': project['content'],
+            'is_ai_generated': project['is_ai_generated'] ?? false,
+          };
+        }).toList();
+
+        awards = List<String>.from(data['awards'] ?? []);
+        certificates = List<String>.from(data['certificates'] ?? []);
+      });
+    }
+  }
+
+  Future<void> _saveProjectsData() async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    await _firestore.collection('users').doc(user.uid).set({
+      'projects': projects,
+      'awards': awards,
+      'certificates': certificates,
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFD1D1D1), Color(0xFF4B6965)],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: Text(
+                    'PROJECTS',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF184D47),
+                      fontFamily: 'Times New Roman',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildSimpleInputField('Project Title', _titleController),
+                _buildSimpleInputField('Your Role', _roleController),
+                _buildSimpleInputField(
+                    'Technologies (comma separated)', _technologyController),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _addProject,
+                  child: Text(_selectedProjectIndex == null
+                      ? 'Add Project'
+                      : 'Update Project'),
+                ),
+                const SizedBox(height: 20),
+                _buildProjectsList(),
+                const SizedBox(height: 30),
+                const Center(
+                  child: Text(
+                    'AWARDS/ACHIEVEMENTS',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF184D47),
+                      fontFamily: 'Times New Roman',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildSimpleInputField('', _awardController),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _addAward,
+                  child: Text(_selectedAwardIndex == null
+                      ? 'Add Award'
+                      : 'Update Award'),
+                ),
+                const SizedBox(height: 20),
+                _buildAwardsList(),
+                const SizedBox(height: 30),
+                const Center(
+                  child: Text(
+                    'CERTIFICATES',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF184D47),
+                      fontFamily: 'Times New Roman',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildSimpleInputField('', _certificateController),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _addCertificate,
+                  child: Text(_selectedCertificateIndex == null
+                      ? 'Add Certificate'
+                      : 'Update Certificate'),
+                ),
+                const SizedBox(height: 20),
+                _buildCertificatesList(),
+                const SizedBox(height: 30),
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (_hasUnsavedChanges()) {
+                        bool shouldContinue = await _showUnsavedChangesDialog();
+                        if (!shouldContinue) return;
+                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const GenerateSummaryPage(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 15),
+                    ),
+                    child: const Text('Continue'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleInputField(String hint, TextEditingController controller) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          hintText: hint,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProjectsList() {
+    return projects.isEmpty
+        ? const Center(
+            child:
+                Text('No projects added yet', style: TextStyle(fontSize: 16)))
+        : Column(
+            children: projects.asMap().entries.map((entry) {
+              int index = entry.key;
+              var project = entry.value;
+              bool isAIGenerated = project['is_ai_generated'] ?? false;
+
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 5),
+                child: ListTile(
+                  title: isAIGenerated
+                      ? Text(
+                          project['content'] ?? '',
+                          style: const TextStyle(color: Colors.blue),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              project['title'] ?? '',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            if (project['role']?.isNotEmpty ?? false)
+                              Text('Role: ${project['role']}'),
+                            if (project['technologies']?.isNotEmpty ?? false)
+                              Text(
+                                  'Technologies: ${(project['technologies'] as List).join(', ')}'),
+                          ],
+                        ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isAIGenerated)
+                        const Icon(Icons.auto_awesome,
+                            color: Colors.blue, size: 20),
+                      IconButton(
+                        icon: const Icon(Icons.edit,
+                            color: Colors.blue, size: 20),
+                        onPressed: () => _editProject(index),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete,
+                            color: Colors.red, size: 20),
+                        onPressed: () => _deleteProject(index),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+  }
+
+  Widget _buildAwardsList() {
+    return awards.isEmpty
+        ? const Center(
+            child: Text('No awards added yet', style: TextStyle(fontSize: 16)))
+        : Column(
+            children: awards.asMap().entries.map((entry) {
+              int index = entry.key;
+              var award = entry.value;
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 5),
+                child: ListTile(
+                  title: Text(award),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit,
+                            color: Colors.blue, size: 20),
+                        onPressed: () => _editAward(index),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete,
+                            color: Colors.red, size: 20),
+                        onPressed: () => _deleteAward(index),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+  }
+
+  Widget _buildCertificatesList() {
+    return certificates.isEmpty
+        ? const Center(
+            child: Text('No certificates added yet',
+                style: TextStyle(fontSize: 16)))
+        : Column(
+            children: certificates.asMap().entries.map((entry) {
+              int index = entry.key;
+              var certificate = entry.value;
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 5),
+                child: ListTile(
+                  title: Text(certificate),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit,
+                            color: Colors.blue, size: 20),
+                        onPressed: () => _editCertificate(index),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete,
+                            color: Colors.red, size: 20),
                         onPressed: () => _deleteCertificate(index),
                       ),
                     ],

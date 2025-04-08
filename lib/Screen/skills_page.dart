@@ -592,6 +592,8 @@ class _SkillsPageState extends State<SkillsPage> {
 }
 */
 
+/*correct one
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -810,6 +812,303 @@ class _SkillsPageState extends State<SkillsPage> {
   }
 
   // Bottom Buttons Widget
+  Widget _buildButton(String text, VoidCallback onPressed) {
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF184D47),
+        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      onPressed: onPressed,
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 16, color: Colors.white),
+      ),
+    );
+  }
+}
+*/
+
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'projects_page.dart';
+
+class SkillsPage extends StatefulWidget {
+  const SkillsPage({super.key});
+
+  @override
+  _SkillsPageState createState() => _SkillsPageState();
+}
+
+class _SkillsPageState extends State<SkillsPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  bool _isEditing = false;
+  List<String> softSkills = [];
+  List<String> technicalSkills = [];
+
+  final TextEditingController _softSkillController = TextEditingController();
+  final TextEditingController _technicalSkillController =
+      TextEditingController();
+
+  // Skill suggestions
+  final List<String> _softSkillSuggestions = [
+    'Communication',
+    'Teamwork',
+    'Problem Solving',
+    'Leadership',
+    'Time Management',
+    'Adaptability',
+    'Creativity',
+    'Work Ethic'
+  ];
+
+  final List<String> _technicalSkillSuggestions = [
+    'Flutter',
+    'Dart',
+    'Firebase',
+    'UI/UX Design',
+    'JavaScript',
+    'Python',
+    'Java',
+    'Swift',
+    'Kotlin',
+    'React Native'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSkillsData();
+  }
+
+  Future<void> _fetchSkillsData() async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    DocumentSnapshot snapshot =
+        await _firestore.collection('users').doc(user.uid).get();
+    if (snapshot.exists) {
+      var data = snapshot.data() as Map<String, dynamic>;
+      setState(() {
+        softSkills = List<String>.from(data['softSkills'] ?? []);
+        technicalSkills = List<String>.from(data['technicalSkills'] ?? []);
+      });
+    }
+  }
+
+  Future<void> _saveSkillsData() async {
+    User? user = _auth.currentUser;
+    if (user == null) return;
+
+    await _firestore.collection('users').doc(user.uid).set({
+      'softSkills': softSkills,
+      'technicalSkills': technicalSkills,
+    }, SetOptions(merge: true));
+  }
+
+  void _addSoftSkill(String? skill) {
+    String skillToAdd = skill ?? _softSkillController.text;
+    if (skillToAdd.trim().isNotEmpty && !softSkills.contains(skillToAdd)) {
+      setState(() {
+        softSkills.add(skillToAdd);
+        _softSkillController.clear();
+      });
+      _saveSkillsData();
+    }
+  }
+
+  void _addTechnicalSkill(String? skill) {
+    String skillToAdd = skill ?? _technicalSkillController.text;
+    if (skillToAdd.trim().isNotEmpty && !technicalSkills.contains(skillToAdd)) {
+      setState(() {
+        technicalSkills.add(skillToAdd);
+        _technicalSkillController.clear();
+      });
+      _saveSkillsData();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white, Color(0xFF97C4B8)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Container(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height,
+              ),
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text(
+                      'SKILLS',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF184D47),
+                        fontFamily: 'Times New Roman',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Soft Skills Section
+                  const Text('Soft skills',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  if (_isEditing)
+                    _buildSkillInput(
+                      context,
+                      _softSkillController,
+                      _softSkillSuggestions,
+                      _addSoftSkill,
+                    ),
+                  _buildSkillList(softSkills),
+
+                  const SizedBox(height: 15),
+
+                  // Technical Skills Section
+                  const Text('Technical skills',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  if (_isEditing)
+                    _buildSkillInput(
+                      context,
+                      _technicalSkillController,
+                      _technicalSkillSuggestions,
+                      _addTechnicalSkill,
+                    ),
+                  _buildSkillList(technicalSkills),
+
+                  const SizedBox(height: 20),
+
+                  // Buttons Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildButton(_isEditing ? 'Save' : 'Edit', () {
+                        setState(() {
+                          _isEditing = !_isEditing;
+                        });
+                      }),
+                      _buildButton('Continue', () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => ProjectsPage()),
+                        );
+                      }),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkillInput(
+    BuildContext context,
+    TextEditingController controller,
+    List<String> suggestions,
+    Function(String?) onAdd,
+  ) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(color: Colors.black),
+                ),
+                child: TextFormField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF184D47),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5)),
+              ),
+              onPressed: () => onAdd(null),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Wrap(
+          spacing: 5,
+          children: suggestions.map((skill) {
+            return FilterChip(
+              label: Text(skill),
+              onSelected: (selected) => onAdd(skill),
+              backgroundColor: Colors.white,
+              selectedColor: const Color(0xFF97C4B8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: Color(0xFF184D47)),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSkillList(List<String> skills) {
+    return skills.isEmpty
+        ? const Text('No skills added.', style: TextStyle(fontSize: 16))
+        : Column(
+            children: skills.map((skill) {
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 5),
+                child: ListTile(
+                  title: Text(skill),
+                  trailing: _isEditing
+                      ? IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            setState(() {
+                              skills.remove(skill);
+                              _saveSkillsData();
+                            });
+                          },
+                        )
+                      : null,
+                ),
+              );
+            }).toList(),
+          );
+  }
+
   Widget _buildButton(String text, VoidCallback onPressed) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
